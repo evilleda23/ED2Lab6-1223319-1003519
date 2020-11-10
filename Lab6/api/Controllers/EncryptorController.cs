@@ -32,7 +32,22 @@ namespace api.Controllers
         [Route("/api/rsa/keys/{p}/{q}")]
         public IActionResult GenerateKeys(int p, int q)
         {
-            return NoContent();
+            try
+            {
+                var encryptor = new RSAEncryptor(env.ContentRootPath);
+                string path = encryptor.GenerateKeys(p, q);
+                if (path != "")
+                {
+                    FileStream fileStream = new FileStream(path, FileMode.OpenOrCreate);
+                    return File(fileStream, "application/zip");
+                }
+                else
+                    return StatusCode(500, "La llave no es valida");
+            }
+            catch
+            {
+                return StatusCode(500);
+            }
         }
 
         [HttpPost]
@@ -41,47 +56,52 @@ namespace api.Controllers
         {
             try
             {
-                string path = env.ContentRootPath + "\\" + file.FileName;
-                using var saver = new FileStream(path, FileMode.Create);
-                file.CopyTo(saver);
-                saver.Close();
-                using var fileWritten = new FileStream(path, FileMode.OpenOrCreate);
-                using var reader = new BinaryReader(fileWritten);
-                byte[] buffer = new byte[0];
-                while (fileWritten.Position < fileWritten.Length)
+                if (key.FileName.Substring(key.FileName.LastIndexOf('.')) == ".key")
                 {
-                    int index = buffer.Length;
-                    Array.Resize<byte>(ref buffer, index + 100000);
-                    byte[] aux = reader.ReadBytes(100000);
-                    aux.CopyTo(buffer, index);
-                }
-                reader.Close();
-                fileWritten.Close();
-                for (int i = buffer.Length - 1; i >= 0; i--)
-                {
-                    if (buffer[i] != 0)
+                    string path = env.ContentRootPath + "\\" + file.FileName;
+                    using var saver = new FileStream(path, FileMode.Create);
+                    file.CopyTo(saver);
+                    saver.Close();
+                    using var fileWritten = new FileStream(path, FileMode.OpenOrCreate);
+                    using var reader = new BinaryReader(fileWritten);
+                    byte[] buffer = new byte[0];
+                    while (fileWritten.Position < fileWritten.Length)
                     {
-                        Array.Resize<byte>(ref buffer, i + 1);
-                        break;
+                        int index = buffer.Length;
+                        Array.Resize<byte>(ref buffer, index + 100000);
+                        byte[] aux = reader.ReadBytes(100000);
+                        aux.CopyTo(buffer, index);
                     }
-                }
-                if (buffer.Length > 0)
-                {
-                    using var content = new MemoryStream();
-                    key.CopyTo(content);
-                    var text = Encoding.ASCII.GetString(content.ToArray());
-                    var encryptor = new RSAEncryptor(env.ContentRootPath);
-                    path = encryptor.Cipher(buffer, new Key(text), nombre);
-                    if (path != "")
+                    reader.Close();
+                    fileWritten.Close();
+                    for (int i = buffer.Length - 1; i >= 0; i--)
                     {
-                        FileStream fileStream = new FileStream(path, FileMode.OpenOrCreate);
-                        return File(fileStream, "text/plain");
+                        if (buffer[i] != 0)
+                        {
+                            Array.Resize<byte>(ref buffer, i + 1);
+                            break;
+                        }
+                    }
+                    if (buffer.Length > 0)
+                    {
+                        using var content = new MemoryStream();
+                        key.CopyTo(content);
+                        var text = Encoding.ASCII.GetString(content.ToArray());
+                        var encryptor = new RSAEncryptor(env.ContentRootPath);
+                        path = encryptor.Cipher(buffer, new Key(text), nombre);
+                        if (path != "")
+                        {
+                            FileStream fileStream = new FileStream(path, FileMode.OpenOrCreate);
+                            return File(fileStream, "text/plain");
+                        }
+                        else
+                            return StatusCode(500, "La llave no es valida");
                     }
                     else
-                        return StatusCode(500, "La llave no es valida");
+                        return StatusCode(500, "El archivo está vacío");
                 }
                 else
-                    return StatusCode(500, "El archivo está vacío");
+                    return StatusCode(500, "La llave no es un archivo .key");
             }
             catch
             {

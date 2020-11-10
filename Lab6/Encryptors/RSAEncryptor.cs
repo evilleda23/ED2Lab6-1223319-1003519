@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
+using System.Numerics;
 using System.Text;
 
 namespace Encryptors
@@ -20,10 +22,26 @@ namespace Encryptors
             {
                 if (IsValid(p, q))
                 {
-                    string path = "";
-                    using var file = new FileStream(path, FileMode.Create);
-                    //file.Write(final, 0, final.Length);
-                    return path;
+                    int n = N(p, q);
+                    int fi = Fi(p, q);
+                    int e = E(fi);
+                    int d = D(e, fi);
+                    if (!Directory.Exists(Path + "\\Keys"))
+                        Directory.CreateDirectory(Path + "\\Keys");
+                    using var publicKey = new FileStream(Path + "\\Keys\\public.key", FileMode.Create);
+                    using var publicWriter = new StreamWriter(publicKey, Encoding.ASCII);
+                    publicWriter.Write(n + "," + e);
+                    using var privateKey = new FileStream(Path + "\\Keys\\private.key", FileMode.Create);
+                    using var privateWriter = new StreamWriter(privateKey, Encoding.ASCII);
+                    privateWriter.Write(n + "," + d);
+                    publicWriter.Close();
+                    privateWriter.Close();
+                    publicKey.Close();
+                    publicWriter.Close();
+                    if (File.Exists(Path + "\\Keys.zip"))
+                        File.Delete(Path + "\\Keys.zip");
+                    ZipFile.CreateFromDirectory(Path + "\\Keys", Path + "\\Keys.zip");
+                    return Path + "\\Keys.zip";
                 }
                 else
                     return "";
@@ -34,9 +52,57 @@ namespace Encryptors
             }
         }
 
-        public byte[] ShowCipher(string text, int n, int x)
+        public int N(int p, int q)
         {
-            return null;
+            return p * q;
+        }
+
+        public int Fi(int p, int q)
+        {
+            return (p - 1) * (q - 1);
+        }
+
+        public int E(int fi)
+        {
+            for (int i = 2; i < fi; i++)
+            {
+                if (IsPrime(i) && fi % i != 0)
+                    return i;
+            }
+            return 0;
+        }
+
+        public int D(int e, int fi)
+        {
+            int j = 1;
+            for (int i = 0; i < fi; i++)
+            {
+                if (j % e == 0)
+                    return j / e;
+                j += fi;
+            }
+            return 0;
+        }
+
+        public string ShowCipher(string text, int n, int x)
+        {
+            return ConvertToString(ShowCipher(ConvertToIntList(ConvertToByteArray(text), n), n, x));
+        }
+
+        private byte[] ShowCipher(List<int> text, int n, int x)
+        {
+            List<int> rsa = new List<int>();
+            foreach(var item in text)
+            {
+                int aux = 1;
+                for (int i = 0; i < x; i++)
+                {
+                    aux *= item;
+                    aux %= n;
+                }
+                rsa.Add(aux);
+            }
+            return ConvertToByteArray(rsa, n);
         }
 
         public string Cipher(byte[] content, Key key, string name)
@@ -45,8 +111,7 @@ namespace Encryptors
             {
                 if (IsValid(key))
                 {
-                    string text = ConvertToString(content);
-                    byte[] final = ShowCipher(text, key.N, key.X);
+                    byte[] final = ShowCipher(ConvertToIntList(content, key.N), key.N, key.X);
                     string path = Path + "\\" + name + ".rsa";
                     using var file = new FileStream(path, FileMode.Create);
                     file.Write(final, 0, final.Length);
@@ -87,6 +152,30 @@ namespace Encryptors
                     return false;
             }
             return true;
+        }
+
+        private List<int> ConvertToIntList(byte[] array, int n)
+        {
+            BigInteger value = new BigInteger(array);
+            List<int> list = new List<int>();
+            while (value > 0)
+            {
+                list.Add((int)(value % n));
+                value /= n;
+            }
+            return list;
+        }
+
+        private byte[] ConvertToByteArray(List<int> list, int n)
+        {
+            BigInteger value = 0;
+            while (list.Count > 0)
+            {
+                value *= n;
+                value += list[list.Count - 1];
+                list.RemoveAt(list.Count - 1);
+            }
+            return value.ToByteArray();
         }
 
         private string ConvertToString(byte[] array)

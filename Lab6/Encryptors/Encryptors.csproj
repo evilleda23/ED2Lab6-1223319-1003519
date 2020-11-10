@@ -4,8 +4,4 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Aspose.Zip" Version="20.9.1" />
-  </ItemGroup>
-
 </Project>

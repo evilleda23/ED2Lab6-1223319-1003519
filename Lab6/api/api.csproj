@@ -5,10 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspose.Zip" Version="20.9.1" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Encryptors\Encryptors.csproj" />
   </ItemGroup>
 
